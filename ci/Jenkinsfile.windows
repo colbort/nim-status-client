@@ -1,19 +1,12 @@
 library 'status-react-jenkins@v1.2.0'
 
 pipeline {
-  agent {
-    docker { 
-      label 'linux'
-      image 'statusteam/nim-status-client-build:latest'
-      /* allows jenkins use cat and mounts '/dev/fuse' for linuxdeployqt */
-      args '--entrypoint="" --cap-add SYS_ADMIN --security-opt apparmor:unconfined --device /dev/fuse'
-    }
-  }
+  agent { label 'windows' }
 
   options {
     timestamps()
     /* Prevent Jenkins jobs from running forever */
-    timeout(time: 15, unit: 'MINUTES')
+    timeout(time: 20, unit: 'MINUTES')
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: '20',
@@ -22,15 +15,30 @@ pipeline {
   }
 
   environment {
-    TARGET = 'linux'
+    TARGET = 'windows'
     /* Improve make performance */
     MAKEFLAGS = '-j4'
     /* Disable colors in Nim compiler logs */
     NIMFLAGS = '--colors:off'
     /* Makefile assumes the compiler folder is included */
-    QTDIR = "/opt/qt/5.14.0/gcc_64"
+    QTDIR = "/c/Qt/5.14.2/msvc2017_64"
+    /* Specify location of compilers */
+    //CMAKE_C_COMPILER = "/c/ProgramData/scoop/apps/gcc/current/bin/msvc"
+    //CMAKE_CXX_COMPILER = "/c/ProgramData/scoop/apps/gcc/current/bin/msvc++"
     /* Control output the filename */
-    STATUS_CLIENT_APPIMAGE = "pkg/${utils.pkgFilename('AppImage')}"
+    STATUS_CLIENT_EXE = "pkg/${utils.pkgFilename('exe')}"
+    /* Adjust path for correct access to build toos */
+    PATH = [
+      "${QTDIR}/Tools/mingw730_64/bin",
+      "${QTDIR}/Tools/CMake_64/bin",
+      '/c/ProgramData/scoop/shims',
+      '/c/ProgramData/scoop/apps/gcc/current/bin',
+      '/c/ProgramData/scoop/apps/git/current/bin',
+      '/c/ProgramData/scoop/apps/git/current/usr/bin',
+      '/c/Windows',
+      '/c/Windows/system32',
+      '/c/Windows/System32/Wbem',
+    ].join(':')
   }
 
   stages {
@@ -56,23 +64,27 @@ pipeline {
     }
 
     stage('Client') {
-      steps { sh 'make nim_status_client' }
+      steps {
+        sh 'mingw32-make vendor/DOtherSide/build/lib/Release/DOtherSide.dll V=4'
+        sh 'make rcc V=4'
+        sh 'make nim_status_client'
+      }
     }
 
     stage('Package') {
-      steps { sh 'make pkg-linux' }
+      steps { sh 'make pkg-windows' }
     }
 
     stage('Parallel Upload') {
       parallel {
         stage('Upload') {
           steps { script {
-            env.PKG_URL = s3.uploadArtifact(env.STATUS_CLIENT_APPIMAGE)
+            env.PKG_URL = s3.uploadArtifact(env.STATUS_CLIENT_EXE)
           } }
         }
         stage('Archive') {
           steps { script {
-            archiveArtifacts(env.STATUS_CLIENT_APPIMAGE)
+            archiveArtifacts(env.STATUS_CLIENT_EXE)
           } }
         }
       }

@@ -179,6 +179,8 @@ CFLAGS += -g
 CXXFLAGS += -g
 
 $(DOTHERSIDE): | deps
+	echo "CMAKE_C_COMPILER: $$CMAKE_C_COMPILER"
+	echo "CMAKE_CXX_COMPILER: $$CMAKE_CXX_COMPILER"
 	echo -e $(BUILD_MSG) "DOtherSide"
 	+ cd vendor/DOtherSide && \
 		mkdir -p build && \
