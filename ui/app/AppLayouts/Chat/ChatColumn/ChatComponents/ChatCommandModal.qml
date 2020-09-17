@@ -29,7 +29,7 @@ ModalPopup {
         anchors.rightMargin: Style.current.padding
         onGroupActivated: {
             root.title = group.headerText
-            btnNext.label = group.footerText
+            btnNext.text = group.footerText
         }
         TransactionFormGroup {
             id: group1
@@ -160,15 +160,14 @@ ModalPopup {
                 stack.back()
             }
         }
-        StyledButton {
+        StatusButton {
             id: btnNext
             anchors.right: parent.right
-            label: qsTr("Next")
-            disabled: !stack.currentGroup.isValid
+            text: qsTr("Next")
+            enabled: stack.currentGroup.isValid && !stack.currentGroup.isPending
             onClicked: {
-                const isValid = stack.currentGroup.validate()
-
-                if (stack.currentGroup.validate()) {
+                const validity = stack.currentGroup.validate()
+                if (validity.isValid && !validity.isPending) {
                     if (stack.isLastGroup) {
                         return root.sendChatCommand(selectFromAccount.selectedAccount.address,
                                                     txtAmount.selectedAmount,
